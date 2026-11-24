@@ -1,0 +1,1906 @@
+```html
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BioLab Quest: Replication & Safety — Interactive Lab Board Game</title>
+  <!-- Tailwind CSS for responsive layout and utility styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono for clean scientific aesthetic -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            lab: {
+              bg: '#090d16',
+              panel: '#111827',
+              card: '#1e293b',
+              border: '#334155',
+              cyan: '#06b6d4',
+              emerald: '#10b981',
+              amber: '#f59e0b',
+              rose: '#f43f5e',
+              violet: '#8b5cf6'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Custom Game Animations & Board Styling */
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #090d16;
+      color: #f8fafc;
+      overflow-x: hidden;
+    }
+
+    /* Subtle lab grid background */
+    .lab-grid-bg {
+      background-image: 
+        linear-gradient(to right, rgba(6, 182, 212, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    /* 3D Dice Animation */
+    @keyframes diceTumble {
+      0% { transform: rotate(0deg) scale(1); }
+      25% { transform: rotate(-18deg) scale(1.12); }
+      50% { transform: rotate(18deg) scale(1.15); }
+      75% { transform: rotate(-10deg) scale(1.08); }
+      100% { transform: rotate(0deg) scale(1); }
+    }
+    .dice-rolling {
+      animation: diceTumble 0.45s ease-in-out infinite;
+    }
+
+    /* Token Bounce & Glow */
+    @keyframes tokenPulse {
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50% { transform: translateY(-4px) scale(1.08); }
+    }
+    .active-token {
+      animation: tokenPulse 1.4s ease-in-out infinite;
+      filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.9));
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Board Tile Aspect & Hover */
+    .board-tile {
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .board-tile:hover {
+      z-index: 15;
+      transform: scale(1.04);
+    }
+
+    /* SVG Connector Overlay */
+    #board-connectors {
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="lab-grid-bg min-h-screen flex flex-col justify-between selection:bg-cyan-500 selection:text-white">
+
+  <!-- ==================== TOP NAVIGATION BAR ==================== -->
+  <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand Logo & Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <!-- DNA + Flask SVG Emblem -->
+          <svg class="w-6 h-6 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 3h6"/>
+            <path d="M10 3v5.5L5.5 16a2.5 2.5 0 0 0 2.1 3.8h8.8a2.5 2.5 0 0 0 2.1-3.8L14 8.5V3"/>
+            <path d="M7.5 14h9"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-extrabold tracking-tight bg-gradient-to-r from-cyan-300 via-emerald-300 to-teal-200 bg-clip-text text-transparent">
+            BioLab Quest: Replication &amp; Safety
+          </h1>
+          <p class="text-[11px] sm:text-xs text-slate-400">Apparatuses • Lab Safety • DNA Replication • Transcription &amp; Translation</p>
+        </div>
+      </div>
+
+      <!-- Header Controls -->
+      <div class="flex items-center gap-2">
+        <!-- Sound Effects Toggle -->
+        <button id="btn-sound" onclick="toggleSound()" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition flex items-center gap-1.5 text-xs font-medium" title="Toggle Sound Effects">
+          <span id="sound-icon">🔊</span>
+          <span class="hidden sm:inline" id="sound-label">SFX On</span>
+        </button>
+
+        <!-- How to Play / Legend -->
+        <button onclick="openModal('modal-rules')" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition text-xs font-medium flex items-center gap-1.5">
+          <span>📘</span>
+          <span class="hidden sm:inline">Rules &amp; Legend</span>
+        </button>
+
+        <!-- GitHub Pages Hosting Guide -->
+        <button onclick="openModal('modal-github')" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-cyan-500/40 text-cyan-300 transition text-xs font-medium flex items-center gap-1.5">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span class="hidden sm:inline">GitHub Host</span>
+        </button>
+
+        <!-- New Game / Setup -->
+        <button onclick="openModal('modal-setup')" class="px-3 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-semibold text-xs shadow-lg shadow-cyan-500/20 transition">
+          + New Match
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN GAME ARENA ==================== -->
+  <main class="max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+    <!-- LEFT / CENTER: 50-TILE WINDING LABORATORY BOARD (8 Cols on Desktop) -->
+    <section class="lg:col-span-8 bg-slate-900/80 border border-slate-800 rounded-2xl p-3 sm:p-5 shadow-2xl relative">
+      <!-- Board Top Status Banner -->
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-xs sm:text-sm font-semibold text-slate-200" id="active-filter-badge">Module: All Lab Topics</span>
+        </div>
+        <!-- Quick Visual Legend -->
+        <div class="flex flex-wrap items-center gap-3 text-[11px] text-slate-300">
+          <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-emerald-500/30 border border-emerald-400 inline-block"></span> DNA Ladder (Boost)</span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-rose-500/30 border border-rose-400 inline-block"></span> Biohazard Chute (Slide)</span>
+          <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-cyan-500/30 border border-cyan-400 inline-block"></span> Lab Station (Quiz)</span>
+        </div>
+      </div>
+
+      <!-- Board Container with Relative Positioning for SVG Connectors -->
+      <div class="relative w-full select-none" id="board-wrapper">
+        <!-- SVG Layer for DNA Ladders & Biohazard Chutes -->
+        <svg id="board-connectors" class="absolute inset-0 w-full h-full z-10" preserveAspectRatio="none"></svg>
+
+        <!-- 10 Columns x 5 Rows = 50 Tiles Grid -->
+        <div id="board-grid" class="grid grid-cols-5 sm:grid-cols-10 gap-1.5 sm:gap-2 relative z-0">
+          <!-- Tiles 1 to 50 dynamically rendered via JS -->
+        </div>
+      </div>
+
+      <!-- Bottom Quick Log / Toast Feed -->
+      <div class="mt-4 bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 overflow-hidden">
+          <span class="text-lg">🔬</span>
+          <p id="game-log-message" class="text-xs sm:text-sm text-slate-300 truncate">
+            Welcome to BioLab Quest! Roll the dice to begin your research journey to Tile 50.
+          </p>
+        </div>
+        <span class="text-[11px] font-mono text-slate-500 shrink-0" id="turn-counter">Turn 1</span>
+      </div>
+    </section>
+
+    <!-- RIGHT SIDEBAR: DICE, PLAYERS, TOPIC FILTER & MASTERY (4 Cols on Desktop) -->
+    <aside class="lg:col-span-4 space-y-4">
+
+      <!-- 1. Turn Control & Animated Dice Card -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
+        <div class="flex items-center justify-between mb-3">
+          <span class="text-xs uppercase tracking-wider font-bold text-slate-400">Current Researcher</span>
+          <span id="current-player-badge" class="px-2.5 py-1 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+            Player 1
+          </span>
+        </div>
+
+        <div class="flex items-center justify-between gap-4 bg-slate-950/80 border border-slate-800/90 rounded-xl p-3.5">
+          <!-- 3D-Styled Dice Display -->
+          <div class="flex items-center gap-3">
+            <div id="dice-box" class="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/10 flex items-center justify-center text-3xl font-extrabold text-cyan-300 select-none">
+              🎲
+            </div>
+            <div>
+              <div id="dice-status-text" class="text-sm font-bold text-white">Ready to Roll</div>
+              <div id="dice-sub-text" class="text-xs text-slate-400">Tap Roll Dice to advance</div>
+            </div>
+          </div>
+
+          <!-- Primary Roll Button -->
+          <button id="btn-roll" onclick="handleRollDice()" class="px-5 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 active:scale-95 disabled:opacity-40 disabled:pointer-events-none text-slate-950 font-extrabold text-sm shadow-lg shadow-emerald-500/20 transition cursor-pointer">
+            Roll Dice
+          </button>
+        </div>
+
+        <!-- Topic Practice Filter Dropdown -->
+        <div class="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+          <label for="topic-filter-select" class="text-xs font-semibold text-slate-400">Focus Topic:</label>
+          <select id="topic-filter-select" onchange="changeTopicFilter(this.value)" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-500">
+            <option value="ALL">All Lab Topics (Mixed)</option>
+            <option value="APPARATUS">1. Laboratory Apparatuses (A, B &amp; C)</option>
+            <option value="SAFETY">2. General Lab Safety</option>
+            <option value="REPLICATION">3. DNA Replication (Steps/Enzymes)</option>
+            <option value="TRANSCRIPTION">4. Transcription &amp; Translation</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 2. Live Scoreboard & Researcher Standings -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs uppercase tracking-wider font-bold text-slate-400">Lab Standings (Goal: Tile 50)</h2>
+          <span class="text-[11px] text-slate-500">🛡️ = Safety Shield</span>
+        </div>
+        <div id="scoreboard-list" class="space-y-2">
+          <!-- Dynamically populated player cards -->
+        </div>
+      </div>
+
+      <!-- 3. Topic Mastery Tracker -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs uppercase tracking-wider font-bold text-slate-400">Topic Mastery Tracker</h2>
+          <span id="overall-accuracy" class="text-xs font-mono font-bold text-emerald-400">0% Overall</span>
+        </div>
+        <div id="mastery-bars" class="space-y-2.5 text-xs">
+          <!-- Dynamically rendered progress bars per category -->
+        </div>
+      </div>
+
+    </aside>
+  </main>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="border-t border-slate-800/80 bg-slate-950/90 py-3 px-4 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>BioLab Quest: Replication &amp; Safety • Single-File Educational Board Game</span>
+      <button onclick="openModal('modal-github')" class="text-cyan-400 hover:underline">
+        Ready for GitHub Pages — Click for 1-Minute Upload Guide
+      </button>
+    </div>
+  </footer>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 1: QUESTION & APPARATUS IDENTIFICATION CHALLENGE                -->
+  <!-- ===================================================================== -->
+  <div id="modal-question" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-xl w-full p-5 sm:p-6 shadow-2xl transform transition-all max-h-[92vh] overflow-y-auto">
+      <!-- Question Header Badges -->
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <span id="q-category-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+          Topic Category
+        </span>
+        <span id="q-event-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+          Lab Check
+        </span>
+      </div>
+
+      <!-- Event Context Banner -->
+      <p id="q-event-desc" class="text-xs text-slate-400 mb-3 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+        Answer correctly to earn a bonus!
+      </p>
+
+      <!-- Custom Inline SVG Illustration Box (Shown for Portable Apparatus Identification) -->
+      <div id="q-svg-container" class="hidden mb-4 bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center">
+        <div id="q-svg-render" class="w-36 h-36 flex items-center justify-center"></div>
+        <span class="text-[11px] text-slate-400 mt-1 font-mono">Inspect the portable laboratory apparatus above</span>
+      </div>
+
+      <!-- Question Prompt -->
+      <h3 id="q-prompt" class="text-base sm:text-lg font-bold text-white leading-snug mb-4">
+        Question text goes here?
+      </h3>
+
+      <!-- Multiple Choice Options -->
+      <div id="q-options" class="space-y-2.5 mb-4">
+        <!-- Buttons injected via JS -->
+      </div>
+
+      <!-- Post-Answer Explanation Box -->
+      <div id="q-feedback-box" class="hidden rounded-xl p-3.5 mb-4 border text-xs sm:text-sm leading-relaxed">
+        <div id="q-feedback-title" class="font-bold mb-1"></div>
+        <div id="q-feedback-text" class="text-slate-200"></div>
+      </div>
+
+      <!-- Continue Button -->
+      <div class="flex justify-end">
+        <button id="btn-q-continue" onclick="closeQuestionModal()" class="hidden px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold text-sm shadow-lg transition">
+          Continue Turn →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 2: NEW GAME SETUP (1-4 PLAYERS OR VS LAB BOT AI)                -->
+  <!-- ===================================================================== -->
+  <div id="modal-setup" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-xl font-extrabold text-white">Configure Lab Match</h2>
+          <p class="text-xs text-slate-400">Select researchers, tokens, and study focus</p>
+        </div>
+        <button onclick="closeModal('modal-setup')" class="text-slate-400 hover:text-white text-lg px-2">✕</button>
+      </div>
+
+      <!-- Game Mode / Player Count -->
+      <div class="mb-4">
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Researchers / Mode</label>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="player-count-selector">
+          <button type="button" onclick="selectPlayerMode('1P_BOT')" data-mode="1P_BOT" class="mode-btn p-2.5 rounded-xl border border-cyan-500 bg-cyan-500/20 text-cyan-200 text-xs font-bold text-center">
+            1P vs Lab Bot 🤖
+          </button>
+          <button type="button" onclick="selectPlayerMode('2P')" data-mode="2P" class="mode-btn p-2.5 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 text-xs font-bold text-center">
+            2 Players
+          </button>
+          <button type="button" onclick="selectPlayerMode('3P')" data-mode="3P" class="mode-btn p-2.5 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 text-xs font-bold text-center">
+            3 Players
+          </button>
+          <button type="button" onclick="selectPlayerMode('4P')" data-mode="4P" class="mode-btn p-2.5 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 text-xs font-bold text-center">
+            4 Players
+          </button>
+        </div>
+      </div>
+
+      <!-- Player Name & Token Inputs -->
+      <div id="setup-players-container" class="space-y-2.5 mb-4">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Topic Module Selection -->
+      <div class="mb-5">
+        <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Curriculum Module</label>
+        <select id="setup-topic-select" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500">
+          <option value="ALL">All Lab Topics (Full Comprehensive Board)</option>
+          <option value="APPARATUS">1. Laboratory Apparatuses (Mass/Vol, Functions, Portable SVGs)</option>
+          <option value="SAFETY">2. General Lab Safety (PPE, SDS, Acid Dilution, Fires)</option>
+          <option value="REPLICATION">3. DNA Replication (Helicase, Primase, Pol III/I, Ligase)</option>
+          <option value="TRANSCRIPTION">4. Transcription &amp; Translation (mRNA, Spliceosome, Ribosome)</option>
+        </select>
+      </div>
+
+      <button onclick="startNewGameFromSetup()" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-extrabold text-sm shadow-lg shadow-emerald-500/20 transition">
+        Start Lab Quest 🚀
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 3: RULES & BOARD MECHANICS LEGEND                               -->
+  <!-- ===================================================================== -->
+  <div id="modal-rules" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-extrabold text-white">📘 BioLab Quest Rules &amp; Mechanics</h2>
+        <button onclick="closeModal('modal-rules')" class="text-slate-400 hover:text-white text-lg">✕</button>
+      </div>
+      <div class="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+          <strong class="text-cyan-300 block mb-1">🎯 Objective</strong>
+          Race from <strong>Tile 1 (Lab Entry)</strong> to <strong>Tile 50 ( Nobel Discovery)</strong> by rolling the dice and mastering laboratory science questions.
+        </div>
+        <div class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
+          <strong class="text-emerald-300 block mb-1">🧬 DNA Double-Helix Ladders (Boosts)</strong>
+          Land on the base of a DNA Helix (e.g., Tile 4 → 16, Tile 12 → 28). Answer the question correctly to <strong>climb the DNA strand</strong>! If you miss, you stay at the base.
+        </div>
+        <div class="p-3 rounded-xl bg-rose-950/30 border border-rose-500/30">
+          <strong class="text-rose-300 block mb-1">☣️ Biohazard &amp; Chemical Spill Chutes</strong>
+          Land on a Biohazard Spill top (e.g., Tile 19 → 6, Tile 47 → 30) and you must answer a <strong>General Lab Safety</strong> question to neutralize the hazard! Answer right to stay safe; answer wrong (or lack a Safety Shield 🛡️) and you slide down!
+        </div>
+        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+          <strong class="text-amber-300 block mb-1">🔬 Standard &amp; Apparatus Stations</strong>
+          Every turn tests your knowledge! Answering standard tile questions correctly grants <strong>+100 Research Points</strong> and charges a <strong>Safety Shield 🛡️</strong> (every 3 streak answers).
+        </div>
+      </div>
+      <div class="mt-5 flex justify-end">
+        <button onclick="closeModal('modal-rules')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold">Got It</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 4: GITHUB PAGES DEPLOYMENT GUIDE                                -->
+  <!-- ===================================================================== -->
+  <div id="modal-github" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-extrabold text-cyan-300">🚀 Host on GitHub Pages in 60 Seconds</h2>
+        <button onclick="closeModal('modal-github')" class="text-slate-400 hover:text-white text-lg">✕</button>
+      </div>
+      <p class="text-xs text-slate-300 mb-3">
+        This entire game is self-contained in a single <code>index.html</code> file with zero external audio/image dependencies, making it ready for GitHub Pages.
+      </p>
+      <ol class="list-decimal list-inside space-y-2 text-xs text-slate-300 bg-slate-950 p-4 rounded-xl border border-slate-800">
+        <li>Create a new public repository on <strong>GitHub.com</strong> (e.g., <code>biolab-quest</code>).</li>
+        <li>Save this code as <strong><code>index.html</code></strong> and upload/commit it to the <code>main</code> branch.</li>
+        <li>Go to your repository <strong>Settings → Pages</strong>.</li>
+        <li>Under <em>Build and deployment</em>, select <strong>Deploy from a branch</strong> → <strong><code>main</code></strong> → <strong><code>/ (root)</code></strong> and click <strong>Save</strong>.</li>
+        <li>Your playable game URL (<code>https://username.github.io/biolab-quest/</code>) goes live automatically!</li>
+      </ol>
+      <div class="mt-4 flex justify-end">
+        <button onclick="closeModal('modal-github')" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold">Close Guide</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 5: VICTORY CELEBRATION MODAL                                    -->
+  <!-- ===================================================================== -->
+  <div id="modal-victory" class="fixed inset-0 z-50 hidden bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-slate-900 border-2 border-emerald-500/60 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl">
+      <div class="text-5xl mb-3">🏆🧬</div>
+      <h2 id="victory-title" class="text-2xl font-extrabold text-white mb-1">Research Breakthrough!</h2>
+      <p id="victory-subtitle" class="text-sm text-emerald-300 mb-4">Player 1 reached Tile 50!</p>
+      <div id="victory-stats" class="bg-slate-950 border border-slate-800 rounded-xl p-4 mb-5 text-left text-xs space-y-2">
+        <!-- Final standings injected here -->
+      </div>
+      <button onclick="closeModal('modal-victory'); openModal('modal-setup');" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 text-slate-950 font-extrabold text-sm shadow-lg">
+        Play Another Match
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- JAVASCRIPT GAME ENGINE, SVG ASSETS & QUESTION BANK                    -->
+  <!-- ===================================================================== -->
+  <script>
+    /**
+     * =========================================================================
+     * 1. WEB AUDIO API SYNTHESIZER (Zero external audio files for GitHub Pages)
+     * =========================================================================
+     */
+    let soundEnabled = true;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) audioCtx = new AudioContext();
+      }
+    }
+
+    function playTone(freq, type = 'sine', duration = 0.15, delay = 0) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(audioCtx.currentTime + delay);
+        osc.stop(audioCtx.currentTime + delay + duration);
+      } catch (e) {
+        // Ignore audio autoplay blocks gracefully
+      }
+    }
+
+    const SFX = {
+      dice: () => {
+        playTone(320, 'triangle', 0.07, 0);
+        playTone(440, 'triangle', 0.07, 0.08);
+        playTone(580, 'triangle', 0.09, 0.16);
+      },
+      correct: () => {
+        playTone(523.25, 'sine', 0.14, 0);     // C5
+        playTone(659.25, 'sine', 0.14, 0.1);   // E5
+        playTone(783.99, 'sine', 0.25, 0.2);   // G5
+      },
+      wrong: () => {
+        playTone(240, 'sawtooth', 0.2, 0);
+        playTone(180, 'sawtooth', 0.3, 0.15);
+      },
+      ladder: () => {
+        [440, 554, 659, 880].forEach((f, idx) => playTone(f, 'sine', 0.14, idx * 0.08));
+      },
+      chute: () => {
+        [520, 410, 310, 210].forEach((f, idx) => playTone(f, 'triangle', 0.14, idx * 0.08));
+      },
+      win: () => {
+        [523.25, 659.25, 783.99, 1046.5].forEach((f, idx) => playTone(f, 'sine', 0.25, idx * 0.12));
+      }
+    };
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('sound-icon').textContent = soundEnabled ? '🔊' : '🔇';
+      document.getElementById('sound-label').textContent = soundEnabled ? 'SFX On' : 'SFX Off';
+    }
+
+    /**
+     * =========================================================================
+     * 2. CUSTOM INLINE SVG ILLUSTRATIONS FOR PORTABLE LAB APPARATUSES
+     * =========================================================================
+     */
+    const APPARATUS_SVGS = {
+      dropper: `
+        <svg viewBox="0 0 120 120" class="w-full h-full">
+          <!-- Rubber Bulb -->
+          <path d="M48 14 C48 6, 72 6, 72 14 L74 34 L46 34 Z" fill="#f43f5e" stroke="#fda4af" stroke-width="2"/>
+          <!-- Collar -->
+          <rect x="44" y="33" width="32" height="7" rx="3" fill="#94a3b8"/>
+          <!-- Glass Pipette Tube -->
+          <path d="M51 40 L69 40 L65 88 L59 102 L55 88 Z" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" stroke-width="2.5"/>
+          <!-- Liquid Inside -->
+          <path d="M53 64 L67 64 L64 88 L59 100 L56 88 Z" fill="#06b6d4"/>
+          <!-- Falling Droplet -->
+          <path d="M59 106 C59 106, 54 113, 59 116 C64 113, 59 106, 59 106 Z" fill="#22d3ee"/>
+        </svg>`,
+      watch_glass: `
+        <svg viewBox="0 0 120 120" class="w-full h-full">
+          <!-- Concave Shallow Circular Glass Dish -->
+          <ellipse cx="60" cy="54" rx="46" ry="14" fill="rgba(148, 163, 184, 0.15)" stroke="#94a3b8" stroke-width="2"/>
+          <path d="M14 54 Q60 88 106 54" fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+          <!-- Solid Crystal Sample Resting Inside -->
+          <polygon points="48,60 58,53 69,58 63,65 51,64" fill="#fbbf24" stroke="#f59e0b" stroke-width="1.5"/>
+          <circle cx="72" cy="61" r="2.5" fill="#fbbf24"/>
+          <circle cx="44" cy="61" r="2" fill="#fbbf24"/>
+        </svg>`,
+      test_tube_rack: `
+        <svg viewBox="0 0 120 120" class="w-full h-full">
+          <!-- Rack Frame -->
+          <rect x="14" y="44" width="92" height="6" rx="2" fill="#cbd5e1"/>
+          <rect x="14" y="92" width="92" height="8" rx="2" fill="#94a3b8"/>
+          <rect x="18" y="44" width="6" height="52" fill="#94a3b8"/>
+          <rect x="96" y="44" width="6" height="52" fill="#94a3b8"/>
+          <!-- Tube 1 -->
+          <path d="M32 24 L44 24 L44 82 A6 6 0 0 1 32 82 Z" fill="rgba(56,189,248,0.2)" stroke="#38bdf8" stroke-width="2"/>
+          <path d="M33 56 L43 56 L43 82 A5 5 0 0 1 33 82 Z" fill="#10b981"/>
+          <!-- Tube 2 -->
+          <path d="M54 24 L66 24 L66 82 A6 6 0 0 1 54 82 Z" fill="rgba(56,189,248,0.2)" stroke="#38bdf8" stroke-width="2"/>
+          <path d="M55 48 L65 48 L65 82 A5 5 0 0 1 55 82 Z" fill="#06b6d4"/>
+          <!-- Tube 3 -->
+          <path d="M76 24 L88 24 L88 82 A6 6 0 0 1 76 82 Z" fill="rgba(56,189,248,0.2)" stroke="#38bdf8" stroke-width="2"/>
+          <path d="M77 62 L87 62 L87 82 A5 5 0 0 1 77 82 Z" fill="#f43f5e"/>
+        </svg>`,
+      tongs: `
+        <svg viewBox="0 0 120 120" class="w-full h-full">
+          <!-- Finger Loops -->
+          <circle cx="26" cy="30" r="10" fill="none" stroke="#cbd5e1" stroke-width="4"/>
+          <circle cx="26" cy="54" r="10" fill="none" stroke="#cbd5e1" stroke-width="4"/>
+          <!-- Scissor Arms -->
+          <path d="M35 33 L74 52 C88 58, 98 46, 106 38" fill="none" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+          <path d="M35 51 L74 36 C88 30, 98 44, 106 52" fill="none" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>
+          <!-- Pivot Rivet -->
+          <circle cx="58" cy="43" r="3.5" fill="#06b6d4"/>
+        </svg>`,
+      crucible: `
+        <svg viewBox="0 0 120 120" class="w-full h-full">
+          <!-- Lid with Handle -->
+          <path d="M34 38 L86 38 L80 31 L40 31 Z" fill="#e2e8f0" stroke="#94a3b8" stroke-width="2"/>
+          <circle cx="60" cy="27" r="4" fill="#cbd5e1"/>
+          <!-- Porcelain Cup Body -->
+          <path d="M36 44 L84 44 L74 92 C73 96, 47 96, 46 92 Z" fill="#f8fafc" stroke="#94a3b8" stroke-width="2.5"/>
+          <!-- Heat Glow Underneath -->
+          <path d="M46 102 Q60 94 74 102" fill="none" stroke="#f97316" stroke-width="3" stroke-linecap="round"/>
+        </svg>`,
+      spatula: `
+        <svg viewBox="0 0 120 120" class="w-full h-full">
+          <!-- Flat Blade End -->
+          <path d="M16 86 L46 58 L54 66 L24 94 C20 97, 13 90, 16 86 Z" fill="#cbd5e1" stroke="#94a3b8" stroke-width="2"/>
+          <!-- Central Rod -->
+          <line x1="50" y1="62" x2="82" y2="32" stroke="#94a3b8" stroke-width="5" stroke-linecap="round"/>
+          <!-- Curved Scoopula Tip -->
+          <path d="M80 34 L102 16 C107 20, 105 27, 99 31 L84 38 Z" fill="#e2e8f0" stroke="#64748b" stroke-width="2"/>
+        </svg>`
+    };
+
+    /**
+     * =========================================================================
+     * 3. COMPREHENSIVE QUESTION BANK (All 4 Curriculum Domains)
+     * =========================================================================
+     */
+    const QUESTION_BANK = [
+      // --- 1A. LABORATORY APPARATUSES: MASS / WEIGHT / VOLUME ---
+      {
+        id: 'app-mv-1',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Mass/Weight/Volume',
+        prompt: 'Which laboratory apparatus is engineered to prepare a precise, fixed volume of standard solution at a specific calibration mark?',
+        options: ['Volumetric flask', 'Erlenmeyer flask', 'Beaker', 'Watch glass'],
+        answer: 0,
+        explanation: 'A volumetric flask has a pear-shaped body and a single etched calibration line on its narrow neck for ultra-accurate solution preparation.'
+      },
+      {
+        id: 'app-mv-2',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Mass/Weight/Volume',
+        prompt: 'When performing a titration and needing to dispense variable, exact volumes of titrant down to 0.05 mL precision, which apparatus should you use?',
+        options: ['Burette', 'Graduated beaker', 'Test tube', 'Separatory funnel'],
+        answer: 0,
+        explanation: 'A burette features fine graduation markings and a precision stopcock at the bottom to dispense exact variable volumes during titration.'
+      },
+      {
+        id: 'app-mv-3',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Mass/Weight/Volume',
+        prompt: 'Why does an analytical balance feature sliding glass draft shields around its weighing pan?',
+        options: [
+          'To prevent air currents from fluctuating sub-milligram mass readings',
+          'To trap toxic fumes during weighing',
+          'To magnify small crystals',
+          'To sterilize samples with UV light'
+        ],
+        answer: 0,
+        explanation: 'Analytical balances measure mass to 0.1 mg (0.0001 g); even slight room air currents would alter the reading without draft shields.'
+      },
+      {
+        id: 'app-mv-4',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Mass/Weight/Volume',
+        prompt: 'In molecular biology, which instrument accurately transfers microliter (µL) volumes of DNA and enzyme reagents?',
+        options: ['Micropipette', 'Graduated cylinder', 'Burette', 'Volumetric flask'],
+        answer: 0,
+        explanation: 'Micropipettes (such as P20, P200, P1000) use disposable tips to measure and transfer exact microliter (10⁻⁶ L) volumes.'
+      },
+      {
+        id: 'app-mv-5',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Mass/Weight/Volume',
+        prompt: 'How should you read the volume of an aqueous solution inside a glass graduated cylinder?',
+        options: [
+          'At eye level, reading the bottom of the concave meniscus',
+          'From above, reading the top edge of the meniscus',
+          'At eye level, reading the highest point on the glass wall',
+          'While holding the cylinder tilted at 45 degrees'
+        ],
+        answer: 0,
+        explanation: 'Water forms a concave meniscus due to adhesion; reading the lowest point at eye level avoids parallax error.'
+      },
+      {
+        id: 'app-mv-6',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Mass/Weight/Volume',
+        prompt: 'Why should a standard glass beaker NEVER be used for accurate analytical volume measurements?',
+        options: [
+          'Beaker markings have a wide ±5% margin of error and are meant only for rough estimation/mixing',
+          'Beakers dissolve in distilled water',
+          'Beakers cannot hold liquids above 25 mL',
+          'Beakers lack a flat bottom'
+        ],
+        answer: 0,
+        explanation: 'Beakers are designed for holding, mixing, and heating liquids—their graduations are approximate (±5%), unlike graduated cylinders or pipettes.'
+      },
+
+      // --- 1B. LABORATORY APPARATUSES: FUNCTIONS ---
+      {
+        id: 'app-fn-1',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Functions',
+        prompt: 'Which apparatus separates two immiscible liquids of different densities (such as organic solvent and water) via a bottom stopcock?',
+        options: ['Separatory funnel', 'Buchner funnel', 'Desiccator', 'Crucible'],
+        answer: 0,
+        explanation: 'A separatory funnel allows immiscible layers to settle by density so the denser bottom layer can be drained cleanly.'
+      },
+      {
+        id: 'app-fn-2',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Functions',
+        prompt: 'What is the primary function of a laboratory desiccator?',
+        options: [
+          'To store hygroscopic chemicals in a moisture-free environment using a drying agent',
+          'To sterilize surgical tools with pressurized steam',
+          'To spin blood samples at high RPM',
+          'To grind solid tablets into fine powder'
+        ],
+        answer: 0,
+        explanation: 'A desiccator is an airtight chamber containing desiccant (like silica gel) that protects moisture-sensitive samples from atmospheric humidity.'
+      },
+      {
+        id: 'app-fn-3',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Functions',
+        prompt: 'How does an autoclave sterilize media, glassware, and biohazard waste?',
+        options: [
+          'Using saturated steam under high pressure (typically 121°C at 15 psi)',
+          'Using dry UV-C radiation at room temperature',
+          'Using liquid nitrogen freezing',
+          'Using ultrasonic sound waves'
+        ],
+        answer: 0,
+        explanation: 'Autoclaves use pressurized steam at 121°C (15 psi) to destroy heat-resistant bacterial endospores and viruses.'
+      },
+      {
+        id: 'app-fn-4',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Functions',
+        prompt: 'A centrifuge separates components of a liquid mixture primarily based on differences in:',
+        options: ['Density and particle size under centrifugal force', 'Boiling point', 'Electrical charge in a gel', 'pH acidity'],
+        answer: 0,
+        explanation: 'Rapid rotation generates high centrifugal force, driving denser pellets (cells, nuclei, precipitates) to the bottom of the tube.'
+      },
+      {
+        id: 'app-fn-5',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Functions',
+        prompt: 'Which pair of tools is specifically designed to crush and grind solid chemical crystals into a fine powder?',
+        options: ['Mortar and pestle', 'Crucible and tongs', 'Watch glass and dropper', 'Burette and ring stand'],
+        answer: 0,
+        explanation: 'The mortar is the heavy bowl and the pestle is the club-shaped tool used to pulverize solids via grinding pressure.'
+      },
+      {
+        id: 'app-fn-6',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Functions',
+        prompt: 'When adjusting a Bunsen burner, opening the air collar (barrel holes) produces what kind of flame?',
+        options: [
+          'A hot, non-luminous blue flame due to complete combustion',
+          'A cool, sooty yellow safety flame',
+          'A green copper-ion flame',
+          'It extinguishes the gas supply immediately'
+        ],
+        answer: 0,
+        explanation: 'Opening the air holes mixes more oxygen with fuel gas, creating complete combustion and a clean, hot blue cone.'
+      },
+
+      // --- 1C. IDENTIFYING PORTABLE APPARATUSES (WITH CUSTOM INLINE SVGS) ---
+      {
+        id: 'app-id-1',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Portable Identification',
+        svgKey: 'dropper',
+        prompt: 'Identify the portable laboratory apparatus shown in the illustration above:',
+        options: ['Dropper / Pasteur pipette', 'Burette', 'Volumetric flask', 'Thermometer'],
+        answer: 0,
+        explanation: 'A dropper (or Pasteur pipette) uses a compressible rubber bulb to draw and dispense small uncalibrated drops of liquid.'
+      },
+      {
+        id: 'app-id-2',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Portable Identification',
+        svgKey: 'watch_glass',
+        prompt: 'Identify this shallow concave glass dish used for evaporating small liquids, weighing solids, or covering beakers:',
+        options: ['Watch glass', 'Petri dish', 'Mortar', 'Evaporating crucible'],
+        answer: 0,
+        explanation: 'A watch glass is a circular, slightly concave piece of glass ideal for holding solid crystals during weighing or loosely covering a beaker.'
+      },
+      {
+        id: 'app-id-3',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Portable Identification',
+        svgKey: 'test_tube_rack',
+        prompt: 'Identify the portable apparatus keeping multiple cylindrical reaction vessels upright:',
+        options: ['Test tube rack', 'Burette clamp', 'Ring stand', 'Desiccator tray'],
+        answer: 0,
+        explanation: 'A test tube rack securely holds multiple test tubes upright to prevent spills during reactions, observation, or drying.'
+      },
+      {
+        id: 'app-id-4',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Portable Identification',
+        svgKey: 'tongs',
+        prompt: 'Identify this hinged metallic instrument used to safely grip and transport hot crucibles or evaporating dishes:',
+        options: ['Crucible tongs', 'Spatula', 'Forceps', 'Test tube brush'],
+        answer: 0,
+        explanation: 'Crucible tongs have curved, serrated tips designed to securely grasp hot porcelain crucibles without burning your hands.'
+      },
+      {
+        id: 'app-id-5',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Portable Identification',
+        svgKey: 'crucible',
+        prompt: 'Identify this heat-resistant porcelain vessel with a lid used for heating chemical compounds to extreme temperatures:',
+        options: ['Crucible (with cover)', 'Graduated cylinder', 'Watch glass', 'Separatory funnel'],
+        answer: 0,
+        explanation: 'A porcelain crucible withstands intense Bunsen burner or furnace heat for ashing, melting, or driving off water of hydration.'
+      },
+      {
+        id: 'app-id-6',
+        category: 'APPARATUS',
+        subtopic: 'Apparatuses: Portable Identification',
+        svgKey: 'spatula',
+        prompt: 'Identify this portable stainless-steel tool used for scooping, transferring, and scraping solid chemical powders:',
+        options: ['Spatula / Scoopula', 'Stirring rod', 'Pipette', 'Inoculating loop'],
+        answer: 0,
+        explanation: 'A laboratory spatula/scoopula transfers small amounts of solid reagents from reagent bottles onto weighing paper or a watch glass.'
+      },
+
+      // --- 2. GENERAL LAB SAFETY ---
+      {
+        id: 'saf-1',
+        category: 'SAFETY',
+        subtopic: 'General Lab Safety',
+        prompt: 'When diluting a concentrated strong acid with water, what is the golden safety rule?',
+        options: [
+          'Always add Acid to Water slowly ("Do as you oughta, add acid to water")',
+          'Always pour Water rapidly into concentrated Acid',
+          'Mix both simultaneously in a sealed flask',
+          'Heat the acid before adding cold water'
+        ],
+        answer: 0,
+        explanation: 'Adding water to concentrated acid causes intense exothermic heat on the surface that can boil and splash corrosive acid onto your skin.'
+      },
+      {
+        id: 'saf-2',
+        category: 'SAFETY',
+        subtopic: 'General Lab Safety',
+        prompt: 'If a corrosive chemical splashes into a researcher’s eyes, how long should they flush their eyes at the emergency eyewash station?',
+        options: ['At least 15 minutes while holding eyelids open', '30 seconds with eyes tightly shut', '2 minutes followed by neutralizing acid', '5 minutes only if pain persists'],
+        answer: 0,
+        explanation: 'Continuous flushing with clean water for at least 15 minutes is required to thoroughly dilute and remove chemical irritants from ocular tissues.'
+      },
+      {
+        id: 'saf-3',
+        category: 'SAFETY',
+        subtopic: 'General Lab Safety',
+        prompt: 'Where should you find detailed information about a chemical’s toxicity, PPE requirements, first-aid measures, and reactivity?',
+        options: ['Safety Data Sheet (SDS)', 'Periodic Table', 'Autoclave logbook', 'Graduated cylinder label'],
+        answer: 0,
+        explanation: 'The Safety Data Sheet (SDS) provides standardized 16-section hazard, handling, storage, and emergency information for every lab chemical.'
+      },
+      {
+        id: 'saf-4',
+        category: 'SAFETY',
+        subtopic: 'General Lab Safety',
+        prompt: 'When working with volatile organic solvents or toxic gases (e.g., concentrated HCl or chloroform), which engineering control must be used?',
+        options: ['Chemical Fume Hood', 'Open lab bench near a window', 'Analytical balance shield', 'Standard sink drain'],
+        answer: 0,
+        explanation: 'A chemical fume hood continuously exhausts hazardous vapors away from the researcher’s breathing zone.'
+      },
+      {
+        id: 'saf-5',
+        category: 'SAFETY',
+        subtopic: 'General Lab Safety',
+        prompt: 'How must broken non-contaminated laboratory glassware be disposed of?',
+        options: [
+          'Swept up with brush/dustpan and placed in a designated rigid Broken Glass disposal box',
+          'Picked up with bare hands and placed in regular trash',
+          'Flushed down the laboratory sink',
+          'Placed inside a standard thin plastic biohazard bag'
+        ],
+        answer: 0,
+        explanation: 'Broken glass punctures regular trash bags and injures custodial staff; always use mechanical tools and a puncture-proof broken glass box.'
+      },
+      {
+        id: 'saf-6',
+        category: 'SAFETY',
+        subtopic: 'General Lab Safety',
+        prompt: 'Which fire extinguisher class is specifically designed for energized electrical equipment fires in a laboratory?',
+        options: ['Class C (e.g., CO₂ or dry chemical)', 'Class A (Pressurized water)', 'Class D (Combustible metals only)', 'Class K (Cooking oils)'],
+        answer: 0,
+        explanation: 'Class C extinguishers use non-conductive agents like CO₂ to extinguish electrical fires without electrocuting the operator.'
+      },
+      {
+        id: 'saf-7',
+        category: 'SAFETY',
+        subtopic: 'General Lab Safety',
+        prompt: 'Which combination represents proper baseline Personal Protective Equipment (PPE) in a wet chemistry/molecular biology lab?',
+        options: [
+          'Splash-proof chemical goggles, buttoned lab coat, nitrile gloves, and closed-toe shoes',
+          'Prescription eyeglasses, sandals, and short sleeves',
+          'Sunglasses and open lab coat',
+          'Gloves only without eye protection'
+        ],
+        answer: 0,
+        explanation: 'Chemical splash goggles, lab coats, appropriate gloves, and closed-toe shoes protect eyes, skin, and feet from spills and splashes.'
+      },
+
+      // --- 3. DNA REPLICATION (STEPS / ENZYMES) ---
+      {
+        id: 'rep-1',
+        category: 'REPLICATION',
+        subtopic: 'DNA Replication (Enzymes)',
+        prompt: 'Which enzyme unwinds the parental DNA double helix at the replication fork by breaking hydrogen bonds between complementary base pairs?',
+        options: ['DNA Helicase', 'DNA Ligase', 'Primase', 'Topoisomerase'],
+        answer: 0,
+        explanation: 'DNA Helicase uses ATP hydrolysis to separate the two antiparallel DNA strands, creating the Y-shaped replication fork.'
+      },
+      {
+        id: 'rep-2',
+        category: 'REPLICATION',
+        subtopic: 'DNA Replication (Enzymes)',
+        prompt: 'What is the role of Topoisomerase (DNA Gyrase in prokaryotes) ahead of the replication fork?',
+        options: [
+          'Relieves torsional strain and supercoiling caused by helicase unwinding',
+          'Synthesizes short RNA primers',
+          'Joins Okazaki fragments together',
+          'Proofreads newly added ribonucleotides'
+        ],
+        answer: 0,
+        explanation: 'Topoisomerase transiently cleaves, untwists, and rejoins DNA strands ahead of the fork to prevent overwinding and supercoiling.'
+      },
+      {
+        id: 'rep-3',
+        category: 'REPLICATION',
+        subtopic: 'DNA Replication (Steps)',
+        prompt: 'Why is Primase essential before DNA Polymerase III can begin synthesizing a new DNA strand?',
+        options: [
+          'DNA Polymerase cannot initiate synthesis de novo and requires a free 3′-OH group from an RNA primer',
+          'Primase unwinds the double helix',
+          'Primase seals phosphodiester bonds between DNA fragments',
+          'Primase degrades old template DNA'
+        ],
+        answer: 0,
+        explanation: 'Primase synthesizes a short ~5–10 nucleotide RNA primer providing the essential free 3′-hydroxyl (-OH) group for DNA Polymerase.'
+      },
+      {
+        id: 'rep-4',
+        category: 'REPLICATION',
+        subtopic: 'DNA Replication (Steps)',
+        prompt: 'In which direction does DNA Polymerase III synthesize new DNA strands, and how does it read the template strand?',
+        options: [
+          'Synthesizes 5′ → 3′ while reading the template 3′ → 5′',
+          'Synthesizes 3′ → 5′ while reading the template 5′ → 3′',
+          'Synthesizes both 5′ → 3′ and 3′ → 5′ simultaneously',
+          'Synthesizes from the center outward in random directions'
+        ],
+        answer: 0,
+        explanation: 'Incoming dNTPs can only be added to a free 3′-OH end, meaning all DNA synthesis proceeds strictly in the 5′ to 3′ direction.'
+      },
+      {
+        id: 'rep-5',
+        category: 'REPLICATION',
+        subtopic: 'DNA Replication (Steps)',
+        prompt: 'Why is the lagging strand synthesized discontinuously as short Okazaki fragments?',
+        options: [
+          'Because its template runs 5′ → 3′ toward the fork, forcing synthesis away from the replication fork',
+          'Because DNA Ligase blocks continuous synthesis',
+          'Because the lagging strand lacks guanine bases',
+          'Because Helicase only unwinds one strand at a time'
+        ],
+        answer: 0,
+        explanation: 'Because DNA strands are antiparallel and DNA Polymerase only builds 5′ → 3′, the lagging strand must be built in short backward segments (Okazaki fragments).'
+      },
+      {
+        id: 'rep-6',
+        category: 'REPLICATION',
+        subtopic: 'DNA Replication (Enzymes)',
+        prompt: 'In E. coli, which enzyme removes RNA primers and replaces them with DNA nucleotides, and which enzyme seals the final sugar-phosphate nick?',
+        options: [
+          'DNA Polymerase I replaces primers; DNA Ligase seals the phosphodiester bond',
+          'Helicase replaces primers; Primase seals the nick',
+          'DNA Polymerase III replaces primers; Topoisomerase seals the nick',
+          'RNA Polymerase replaces primers; Ribosome seals the nick'
+        ],
+        answer: 0,
+        explanation: 'DNA Polymerase I uses 5′→3′ exonuclease activity to remove RNA primers and fill with DNA, while DNA Ligase forms the final phosphodiester bond.'
+      },
+
+      // --- 4. TRANSCRIPTION & TRANSLATION ---
+      {
+        id: 'trn-1',
+        category: 'TRANSCRIPTION',
+        subtopic: 'Transcription',
+        prompt: 'During transcription initiation in eukaryotes, what DNA sequence in the promoter helps position RNA Polymerase II?',
+        options: ['The TATA box', 'The Shine-Dalgarno sequence', 'The poly-A tail', 'The anticodon loop'],
+        answer: 0,
+        explanation: 'Transcription factors (like TFIID/TBP) bind the conserved TATA box in the promoter to recruit RNA Polymerase II.'
+      },
+      {
+        id: 'trn-2',
+        category: 'TRANSCRIPTION',
+        subtopic: 'RNA Processing',
+        prompt: 'Which three modifications convert eukaryotic pre-mRNA into mature mRNA before nuclear export?',
+        options: [
+          '5′ methylated guanine cap addition, 3′ poly-A tail addition, and intron splicing',
+          'Okazaki ligation, primer removal, and methylation',
+          'Peptide bond formation, folding, and ubiquitination',
+          'Helicase unwinding, SSB binding, and ligation'
+        ],
+        answer: 0,
+        explanation: 'Eukaryotic pre-mRNA receives a 5′ cap and 3′ poly-A tail for stability/export, while the spliceosome removes introns and joins exons.'
+      },
+      {
+        id: 'trn-3',
+        category: 'TRANSCRIPTION',
+        subtopic: 'RNA Processing',
+        prompt: 'During eukaryotic mRNA splicing, which segments are removed and which segments are joined together to be expressed?',
+        options: [
+          'Introns are excised; Exons are spliced together',
+          'Exons are excised; Introns are spliced together',
+          'Codons are excised; Anticodons are spliced together',
+          'Promoters are excised; Terminators are spliced together'
+        ],
+        answer: 0,
+        explanation: 'Introns (intervening sequences) are removed by the spliceosome, while Exons (expressed sequences) are joined to form the coding mRNA.'
+      },
+      {
+        id: 'trn-4',
+        category: 'TRANSCRIPTION',
+        subtopic: 'Translation',
+        prompt: 'What is the universal eukaryotic start codon on mRNA, and which amino acid does it encode?',
+        options: ['AUG — Methionine (Met)', 'UAA — Stop', 'UGG — Tryptophan', 'GCA — Alanine'],
+        answer: 0,
+        explanation: 'AUG serves as the translation initiation codon and codes for Methionine, setting the reading frame for the ribosome.'
+      },
+      {
+        id: 'trn-5',
+        category: 'TRANSCRIPTION',
+        subtopic: 'Translation',
+        prompt: 'In the ribosome during translation elongation, what happens at the A, P, and E sites in sequence?',
+        options: [
+          'Aminoacyl-tRNA enters at A site → Peptide bond forms at P site → Empty tRNA exits at E site',
+          'Empty tRNA enters at A site → mRNA degrades at P site → DNA replicates at E site',
+          'Peptide exits at A site → Aminoacyl-tRNA enters at E site → Start codon binds at P site',
+          'Introns splice at A site → Poly-A tail forms at P site → Cap forms at E site'
+        ],
+        answer: 0,
+        explanation: 'Incoming charged tRNA binds the A (Aminoacyl) site, transfers the growing polypeptide at the P (Peptidyl) site, and exits via the E (Exit) site.'
+      },
+      {
+        id: 'trn-6',
+        category: 'TRANSCRIPTION',
+        subtopic: 'Translation',
+        prompt: 'Which three mRNA triplets act as Stop Codons that recruit release factors to terminate translation?',
+        options: ['UAA, UAG, and UGA', 'AUG, UGG, and UUU', 'AAA, CCC, and GGG', 'TAA, TAG, and TGA'],
+        answer: 0,
+        explanation: 'UAA, UAG, and UGA are mRNA stop codons (note uracil U instead of thymine T) that bind protein release factors rather than tRNAs.'
+      }
+    ];
+
+    /**
+     * =========================================================================
+     * 4. BOARD TOPOLOGY: 50 TILES, DNA LADDERS & BIOHAZARD CHUTES
+     * =========================================================================
+     */
+    const TOTAL_TILES = 50;
+
+    // DNA Double-Helix Ladders: { startTile: endTile }
+    const DNA_LADDERS = {
+      4: 16,
+      9: 22,
+      14: 27,
+      21: 35,
+      29: 43,
+      33: 46
+    };
+
+    // Biohazard / Chemical Spill Chutes: { topTile: bottomTile }
+    const BIOHAZARD_CHUTES = {
+      17: 5,
+      24: 11,
+      31: 18,
+      39: 25,
+      44: 28,
+      48: 34
+    };
+
+    // Special Lab Apparatus & Safety Checkpoints on the board
+    const STATION_TILES = {
+      3: 'APPARATUS',
+      7: 'SAFETY',
+      12: 'REPLICATION',
+      15: 'TRANSCRIPTION',
+      20: 'APPARATUS',
+      26: 'REPLICATION',
+      32: 'TRANSCRIPTION',
+      37: 'APPARATUS',
+      41: 'SAFETY',
+      45: 'REPLICATION'
+    };
+
+    const PLAYER_PRESETS = [
+      { name: 'Dr. Helix', token: '🧬', color: 'from-cyan-500 to-blue-600', ring: 'ring-cyan-400', isBot: false },
+      { name: 'Lab Bot AI', token: '🤖', color: 'from-emerald-500 to-teal-600', ring: 'ring-emerald-400', isBot: true },
+      { name: 'Prof. Flask', token: '⚗️', color: 'from-amber-500 to-orange-600', ring: 'ring-amber-400', isBot: false },
+      { name: 'Atom Ace', token: '⚛️', color: 'from-violet-500 to-purple-600', ring: 'ring-violet-400', isBot: false }
+    ];
+
+    /**
+     * =========================================================================
+     * 5. GAME STATE MANAGEMENT
+     * =========================================================================
+     */
+    let gameState = {
+      players: [],
+      currentPlayerIndex: 0,
+      turnNumber: 1,
+      isRolling: false,
+      isModalOpen: false,
+      gameOver: false,
+      topicFilter: 'ALL',
+      usedQuestionIds: new Set(),
+      pendingTurnContext: null,
+      mastery: {
+        APPARATUS: { correct: 0, total: 0, label: '1. Lab Apparatuses (A, B & C)' },
+        SAFETY: { correct: 0, total: 0, label: '2. General Lab Safety' },
+        REPLICATION: { correct: 0, total: 0, label: '3. DNA Replication' },
+        TRANSCRIPTION: { correct: 0, total: 0, label: '4. Transcription & Translation' }
+      }
+    };
+
+    let selectedSetupMode = '1P_BOT';
+
+    /**
+     * =========================================================================
+     * 6. INITIALIZATION & SETUP MODAL LOGIC
+     * =========================================================================
+     */
+    function selectPlayerMode(mode) {
+      selectedSetupMode = mode;
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        if (btn.dataset.mode === mode) {
+          btn.className = 'mode-btn p-2.5 rounded-xl border border-cyan-500 bg-cyan-500/20 text-cyan-200 text-xs font-bold text-center';
+        } else {
+          btn.className = 'mode-btn p-2.5 rounded-xl border border-slate-700 bg-slate-800 text-slate-300 text-xs font-bold text-center';
+        }
+      });
+      renderSetupPlayerInputs();
+    }
+
+    function renderSetupPlayerInputs() {
+      const container = document.getElementById('setup-players-container');
+      container.innerHTML = '';
+
+      let count = 2;
+      let secondIsBot = false;
+      if (selectedSetupMode === '1P_BOT') { count = 2; secondIsBot = true; }
+      if (selectedSetupMode === '2P') { count = 2; }
+      if (selectedSetupMode === '3P') { count = 3; }
+      if (selectedSetupMode === '4P') { count = 4; }
+
+      for (let i = 0; i < count; i++) {
+        const preset = PLAYER_PRESETS[i];
+        const isBotRow = (i === 1 && secondIsBot);
+        const defaultName = isBotRow ? 'Lab Bot AI' : (i === 1 && !secondIsBot ? 'Dr. Curie' : preset.name);
+        const tokenOptions = ['🧬', '🔬', '⚗️', '⚛️', '🧫', '🧪'];
+
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2 bg-slate-950 border border-slate-800 p-2.5 rounded-xl';
+        row.innerHTML = `
+          <select id="setup-token-${i}" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-lg">
+            ${tokenOptions.map(t => `<option value="${t}" ${t === (isBotRow ? '🤖' : preset.token) ? 'selected' : ''}>${t}</option>`).join('')}
+            ${isBotRow ? '<option value="🤖" selected>🤖</option>' : ''}
+          </select>
+          <input id="setup-name-${i}" type="text" value="${defaultName}" maxlength="18"
+            class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs sm:text-sm text-white focus:outline-none focus:border-cyan-500"
+            placeholder="Researcher Name" />
+          <span class="text-[11px] font-mono px-2 py-1 rounded bg-slate-800 text-slate-400">
+            ${isBotRow ? 'AI BOT' : 'HUMAN'}
+          </span>
+        `;
+        container.appendChild(row);
+      }
+    }
+
+    function startNewGameFromSetup() {
+      let count = 2;
+      let secondIsBot = false;
+      if (selectedSetupMode === '1P_BOT') { count = 2; secondIsBot = true; }
+      if (selectedSetupMode === '2P') count = 2;
+      if (selectedSetupMode === '3P') count = 3;
+      if (selectedSetupMode === '4P') count = 4;
+
+      const players = [];
+      for (let i = 0; i < count; i++) {
+        const nameInput = document.getElementById(`setup-name-${i}`);
+        const tokenInput = document.getElementById(`setup-token-${i}`);
+        const preset = PLAYER_PRESETS[i];
+        players.push({
+          id: i,
+          name: (nameInput && nameInput.value.trim()) || preset.name,
+          token: (tokenInput && tokenInput.value) || preset.token,
+          color: preset.color,
+          ring: preset.ring,
+          isBot: (i === 1 && secondIsBot),
+          position: 1,
+          score: 0,
+          streak: 0,
+          shields: 1 // Every researcher starts with 1 Lab Safety Shield!
+        });
+      }
+
+      const topicVal = document.getElementById('setup-topic-select').value;
+      document.getElementById('topic-filter-select').value = topicVal;
+
+      gameState = {
+        players,
+        currentPlayerIndex: 0,
+        turnNumber: 1,
+        isRolling: false,
+        isModalOpen: false,
+        gameOver: false,
+        topicFilter: topicVal,
+        usedQuestionIds: new Set(),
+        pendingTurnContext: null,
+        mastery: {
+          APPARATUS: { correct: 0, total: 0, label: '1. Lab Apparatuses (A, B & C)' },
+          SAFETY: { correct: 0, total: 0, label: '2. General Lab Safety' },
+          REPLICATION: { correct: 0, total: 0, label: '3. DNA Replication' },
+          TRANSCRIPTION: { correct: 0, total: 0, label: '4. Transcription & Translation' }
+        }
+      };
+
+      closeModal('modal-setup');
+      updateTopicBadge();
+      renderBoard();
+      updateUI();
+      logMessage(`Match started! ${players[0].name} rolls first. Each player starts with 1 Safety Shield 🛡️.`);
+    }
+
+    /**
+     * =========================================================================
+     * 7. BOARD RENDERING (50-TILE SNAKING GRID + SVG CONNECTORS)
+     * =========================================================================
+     */
+    function getBoardTileOrder() {
+      // 5 rows of 10 tiles, snaking bottom-to-top like classic Snakes & Ladders
+      // Row 4 (top): 41 -> 50
+      // Row 3: 40 <- 31
+      // Row 2: 21 -> 30
+      // Row 1: 20 <- 11
+      // Row 0 (bottom): 1 -> 10
+      const ordered = [];
+      for (let row = 4; row >= 0; row--) {
+        const start = row * 10 + 1;
+        const rowTiles = [];
+        for (let col = 0; col < 10; col++) {
+          rowTiles.push(start + col);
+        }
+        if (row % 2 === 1) {
+          rowTiles.reverse();
+        }
+        ordered.push(...rowTiles);
+      }
+      return ordered;
+    }
+
+    function renderBoard() {
+      const grid = document.getElementById('board-grid');
+      grid.innerHTML = '';
+      const tileNumbers = getBoardTileOrder();
+
+      tileNumbers.forEach(num => {
+        const tile = document.createElement('div');
+        tile.id = `tile-${num}`;
+
+        const isLadderStart = DNA_LADDERS[num] !== undefined;
+        const isChuteStart = BIOHAZARD_CHUTES[num] !== undefined;
+        const stationType = STATION_TILES[num];
+        const isGoal = num === TOTAL_TILES;
+        const isStart = num === 1;
+
+        let bgClass = 'bg-slate-800/75 border-slate-700/80';
+        let badgeHTML = '';
+
+        if (isGoal) {
+          bgClass = 'bg-gradient-to-br from-amber-500/30 via-emerald-500/30 to-cyan-500/30 border-amber-400 shadow-lg shadow-amber-500/10';
+          badgeHTML = `<span class="text-[10px] font-extrabold text-amber-300">🏆 GOAL</span>`;
+        } else if (isStart) {
+          bgClass = 'bg-cyan-950/60 border-cyan-500/60';
+          badgeHTML = `<span class="text-[10px] font-bold text-cyan-300">START</span>`;
+        } else if (isLadderStart) {
+          bgClass = 'bg-emerald-950/60 border-emerald-500/70';
+          badgeHTML = `<span class="text-[10px] font-bold text-emerald-300">🧬↑${DNA_LADDERS[num]}</span>`;
+        } else if (isChuteStart) {
+          bgClass = 'bg-rose-950/60 border-rose-500/70';
+          badgeHTML = `<span class="text-[10px] font-bold text-rose-300">☣️↓${BIOHAZARD_CHUTES[num]}</span>`;
+        } else if (stationType) {
+          bgClass = 'bg-cyan-950/40 border-cyan-500/40';
+          const iconMap = { APPARATUS: '🔬', SAFETY: '🥽', REPLICATION: '🧬', TRANSCRIPTION: '📜' };
+          badgeHTML = `<span class="text-[10px] text-cyan-300">${iconMap[stationType]}</span>`;
+        }
+
+        tile.className = `board-tile relative rounded-xl border ${bgClass} p-1.5 min-h-[54px] sm:min-h-[64px] flex flex-col justify-between`;
+        tile.innerHTML = `
+          <div class="flex items-center justify-between leading-none">
+            <span class="font-mono text-[11px] font-bold ${isGoal ? 'text-amber-300' : 'text-slate-400'}">${num}</span>
+            ${badgeHTML}
+          </div>
+          <div id="tile-tokens-${num}" class="flex flex-wrap items-center justify-center gap-0.5 my-auto min-h-[24px]"></div>
+        `;
+        grid.appendChild(tile);
+      });
+
+      renderTokensOnBoard();
+      // Draw SVG connectors after layout paint
+      requestAnimationFrame(drawBoardConnectors);
+    }
+
+    function renderTokensOnBoard() {
+      // Clear existing token slots
+      for (let i = 1; i <= TOTAL_TILES; i++) {
+        const slot = document.getElementById(`tile-tokens-${i}`);
+        if (slot) slot.innerHTML = '';
+      }
+
+      gameState.players.forEach((p, idx) => {
+        const slot = document.getElementById(`tile-tokens-${p.position}`);
+        if (!slot) return;
+        const isCurrent = idx === gameState.currentPlayerIndex && !gameState.gameOver;
+        const tokenEl = document.createElement('span');
+        tokenEl.className = `inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-br ${p.color} text-xs sm:text-sm shadow-md ring-2 ${p.ring} ${isCurrent ? 'active-token z-20' : 'opacity-95'}`;
+        tokenEl.title = `${p.name} (Tile ${p.position})`;
+        tokenEl.textContent = p.token;
+        slot.appendChild(tokenEl);
+      });
+    }
+
+    function drawBoardConnectors() {
+      const svg = document.getElementById('board-connectors');
+      const wrapper = document.getElementById('board-wrapper');
+      if (!svg || !wrapper) return;
+
+      const wrapRect = wrapper.getBoundingClientRect();
+      if (wrapRect.width === 0 || wrapRect.height === 0) return;
+
+      svg.setAttribute('viewBox', `0 0 ${wrapRect.width} ${wrapRect.height}`);
+      svg.innerHTML = '';
+
+      const getTileCenter = (tileNum) => {
+        const el = document.getElementById(`tile-${tileNum}`);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return {
+          x: r.left - wrapRect.left + r.width / 2,
+          y: r.top - wrapRect.top + r.height / 2
+        };
+      };
+
+      // Draw DNA Helix Ladders (Emerald Double Strands)
+      Object.entries(DNA_LADDERS).forEach(([fromStr, toNum]) => {
+        const p1 = getTileCenter(Number(fromStr));
+        const p2 = getTileCenter(toNum);
+        if (!p1 || !p2) return;
+
+        const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line1.setAttribute('x1', p1.x - 4);
+        line1.setAttribute('y1', p1.y);
+        line1.setAttribute('x2', p2.x - 4);
+        line1.setAttribute('y2', p2.y);
+        line1.setAttribute('stroke', 'rgba(16, 185, 129, 0.45)');
+        line1.setAttribute('stroke-width', '2.5');
+        line1.setAttribute('stroke-dasharray', '5,4');
+
+        const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line2.setAttribute('x1', p1.x + 4);
+        line2.setAttribute('y1', p1.y);
+        line2.setAttribute('x2', p2.x + 4);
+        line2.setAttribute('y2', p2.y);
+        line2.setAttribute('stroke', 'rgba(6, 182, 212, 0.45)');
+        line2.setAttribute('stroke-width', '2.5');
+        line2.setAttribute('stroke-dasharray', '5,4');
+
+        svg.appendChild(line1);
+        svg.appendChild(line2);
+      });
+
+      // Draw Biohazard Chutes (Rose Curved Spill Paths)
+      Object.entries(BIOHAZARD_CHUTES).forEach(([fromStr, toNum]) => {
+        const p1 = getTileCenter(Number(fromStr));
+        const p2 = getTileCenter(toNum);
+        if (!p1 || !p2) return;
+
+        const midX = (p1.x + p2.x) / 2 + 16;
+        const midY = (p1.y + p2.y) / 2;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', 'rgba(244, 63, 94, 0.45)');
+        path.setAttribute('stroke-width', '3');
+        path.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(path);
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      requestAnimationFrame(drawBoardConnectors);
+    });
+
+    /**
+     * =========================================================================
+     * 8. DICE ROLL & MOVEMENT ENGINE
+     * =========================================================================
+     */
+    function handleRollDice() {
+      if (gameState.isRolling || gameState.isModalOpen || gameState.gameOver) return;
+
+      const player = gameState.players[gameState.currentPlayerIndex];
+      gameState.isRolling = true;
+      document.getElementById('btn-roll').disabled = true;
+
+      const diceBox = document.getElementById('dice-box');
+      const diceStatus = document.getElementById('dice-status-text');
+      const diceSub = document.getElementById('dice-sub-text');
+
+      diceBox.classList.add('dice-rolling');
+      diceStatus.textContent = 'Rolling...';
+      diceSub.textContent = `${player.name} is rolling`;
+      SFX.dice();
+
+      const diceFaces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+      let ticks = 0;
+      const rollInterval = setInterval(() => {
+        const randFace = diceFaces[Math.floor(Math.random() * 6)];
+        diceBox.textContent = randFace;
+        ticks++;
+        if (ticks >= 8) {
+          clearInterval(rollInterval);
+          diceBox.classList.remove('dice-rolling');
+          const rolledValue = Math.floor(Math.random() * 6) + 1;
+          diceBox.textContent = `${diceFaces[rolledValue - 1]}`;
+          diceStatus.textContent = `Rolled a ${rolledValue}!`;
+          diceSub.textContent = `Advancing ${rolledValue} tile${rolledValue > 1 ? 's' : ''}`;
+          movePlayerStepByStep(player, rolledValue);
+        }
+      }, 65);
+    }
+
+    function movePlayerStepByStep(player, steps) {
+      let remaining = steps;
+      const stepTimer = setInterval(() => {
+        if (remaining > 0 && player.position < TOTAL_TILES) {
+          player.position++;
+          remaining--;
+          renderTokensOnBoard();
+          updateUI();
+        } else {
+          clearInterval(stepTimer);
+          gameState.isRolling = false;
+          evaluateLandedTile(player);
+        }
+      }, 210);
+    }
+
+    function evaluateLandedTile(player) {
+      const pos = player.position;
+
+      // Check immediate win condition
+      if (pos >= TOTAL_TILES) {
+        triggerVictory(player);
+        return;
+      }
+
+      // Determine tile event type
+      if (DNA_LADDERS[pos] !== undefined) {
+        const targetTile = DNA_LADDERS[pos];
+        logMessage(`🧬 ${player.name} landed on a DNA Helix Ladder at Tile ${pos}! Answer correctly to climb to Tile ${targetTile}!`);
+        triggerQuestionChallenge(player, 'LADDER', targetTile);
+      } else if (BIOHAZARD_CHUTES[pos] !== undefined) {
+        const targetTile = BIOHAZARD_CHUTES[pos];
+        logMessage(`☣️ Biohazard Spill at Tile ${pos}! ${player.name} must pass a Lab Safety check or slide to Tile ${targetTile}!`);
+        triggerQuestionChallenge(player, 'CHUTE', targetTile);
+      } else {
+        const forcedCategory = STATION_TILES[pos] || null;
+        logMessage(`🔬 ${player.name} arrived at Tile ${pos}. Answer the lab question for Research Points!`);
+        triggerQuestionChallenge(player, 'STANDARD', pos, forcedCategory);
+      }
+    }
+
+    /**
+     * =========================================================================
+     * 9. QUESTION SELECTION, SVG RENDERING & ANSWER VERIFICATION
+     * =========================================================================
+     */
+    function pickQuestion(forcedCategory = null) {
+      // Determine desired category
+      let targetCategory = forcedCategory;
+      if (gameState.topicFilter !== 'ALL') {
+        targetCategory = gameState.topicFilter;
+      }
+
+      let pool = QUESTION_BANK;
+      if (targetCategory) {
+        const filtered = QUESTION_BANK.filter(q => q.category === targetCategory);
+        if (filtered.length > 0) pool = filtered;
+      }
+
+      // Filter out recently used questions if possible
+      let unused = pool.filter(q => !gameState.usedQuestionIds.has(q.id));
+      if (unused.length === 0) {
+        // Reset used history for this pool
+        pool.forEach(q => gameState.usedQuestionIds.delete(q.id));
+        unused = pool;
+      }
+
+      const chosen = unused[Math.floor(Math.random() * unused.length)];
+      gameState.usedQuestionIds.add(chosen.id);
+      return chosen;
+    }
+
+    function triggerQuestionChallenge(player, eventType, targetTile, forcedCategory = null) {
+      // Chutes prioritize General Lab Safety questions unless topicFilter overrides
+      let categoryOverride = forcedCategory;
+      if (eventType === 'CHUTE' && gameState.topicFilter === 'ALL') {
+        categoryOverride = 'SAFETY';
+      }
+
+      const question = pickQuestion(categoryOverride);
+      gameState.pendingTurnContext = {
+        player,
+        eventType,
+        targetTile,
+        question,
+        answered: false
+      };
+
+      // If current player is the AI Lab Bot, simulate thinking and answering automatically
+      if (player.isBot) {
+        handleBotTurn(player, eventType, targetTile, question);
+        return;
+      }
+
+      // Populate Question Modal
+      gameState.isModalOpen = true;
+      document.getElementById('q-category-badge').textContent = question.subtopic;
+
+      const eventBadge = document.getElementById('q-event-badge');
+      const eventDesc = document.getElementById('q-event-desc');
+
+      if (eventType === 'LADDER') {
+        eventBadge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        eventBadge.textContent = `🧬 DNA Ladder (Tile ${player.position} → ${targetTile})`;
+        eventDesc.textContent = `Answer correctly to climb the DNA double helix up to Tile ${targetTile} (+200 pts)!`;
+      } else if (eventType === 'CHUTE') {
+        eventBadge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30';
+        eventBadge.textContent = `☣️ Biohazard Spill (Tile ${player.position} → ${targetTile})`;
+        eventDesc.textContent = `Neutralize the chemical spill! Answer right to stay safe at Tile ${player.position}. Wrong answer slides you down to Tile ${targetTile}${player.shields > 0 ? ' (unless your Safety Shield 🛡️ blocks it!)' : ''}.`;
+      } else {
+        eventBadge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+        eventBadge.textContent = `🔬 Lab Research Check (Tile ${player.position})`;
+        eventDesc.textContent = `Correct answers earn +100 pts and build your streak toward a Safety Shield 🛡️!`;
+      }
+
+      // Show custom inline SVG if this is a Portable Apparatus Identification question
+      const svgContainer = document.getElementById('q-svg-container');
+      const svgRender = document.getElementById('q-svg-render');
+      if (question.svgKey && APPARATUS_SVGS[question.svgKey]) {
+        svgContainer.classList.remove('hidden');
+        svgRender.innerHTML = APPARATUS_SVGS[question.svgKey];
+      } else {
+        svgContainer.classList.add('hidden');
+        svgRender.innerHTML = '';
+      }
+
+      document.getElementById('q-prompt').textContent = question.prompt;
+
+      // Shuffle display order of options while tracking the right answer
+      const optionIndices = question.options.map((_, idx) => idx);
+      for (let i = optionIndices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [optionIndices[i], optionIndices[j]] = [optionIndices[j], optionIndices[i]];
+      }
+
+      const optionsBox = document.getElementById('q-options');
+      optionsBox.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+
+      optionIndices.forEach((origIdx, displayIdx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.origIdx = origIdx;
+        btn.className = 'q-opt-btn w-full text-left p-3.5 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-100 text-xs sm:text-sm font-medium transition flex items-start gap-3 cursor-pointer';
+        btn.innerHTML = `
+          <span class="w-6 h-6 rounded-lg bg-slate-950 border border-slate-700 flex items-center justify-center text-xs font-bold text-cyan-400 shrink-0">${letters[displayIdx]}</span>
+          <span class="pt-0.5">${question.options[origIdx]}</span>
+        `;
+        btn.onclick = () => submitQuestionAnswer(origIdx);
+        optionsBox.appendChild(btn);
+      });
+
+      document.getElementById('q-feedback-box').classList.add('hidden');
+      document.getElementById('btn-q-continue').classList.add('hidden');
+      openModal('modal-question');
+    }
+
+    function submitQuestionAnswer(selectedOrigIdx) {
+      const ctx = gameState.pendingTurnContext;
+      if (!ctx || ctx.answered) return;
+      ctx.answered = true;
+
+      const { player, eventType, targetTile, question } = ctx;
+      const isCorrect = (selectedOrigIdx === question.answer);
+
+      // Record Mastery Metrics
+      if (gameState.mastery[question.category]) {
+        gameState.mastery[question.category].total++;
+        if (isCorrect) gameState.mastery[question.category].correct++;
+      }
+
+      // Highlight Option Buttons
+      document.querySelectorAll('.q-opt-btn').forEach(btn => {
+        btn.disabled = true;
+        const idx = Number(btn.dataset.origIdx);
+        if (idx === question.answer) {
+          btn.className = 'q-opt-btn w-full text-left p-3.5 rounded-xl bg-emerald-950/80 border-2 border-emerald-400 text-emerald-100 text-xs sm:text-sm font-semibold flex items-start gap-3';
+        } else if (idx === selectedOrigIdx && !isCorrect) {
+          btn.className = 'q-opt-btn w-full text-left p-3.5 rounded-xl bg-rose-950/80 border-2 border-rose-500 text-rose-100 text-xs sm:text-sm font-semibold flex items-start gap-3';
+        } else {
+          btn.className = 'q-opt-btn w-full text-left p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 text-slate-500 text-xs sm:text-sm flex items-start gap-3';
+        }
+      });
+
+      const feedbackBox = document.getElementById('q-feedback-box');
+      const feedbackTitle = document.getElementById('q-feedback-title');
+      const feedbackText = document.getElementById('q-feedback-text');
+
+      feedbackBox.classList.remove('hidden');
+      feedbackText.textContent = question.explanation;
+
+      if (isCorrect) {
+        SFX.correct();
+        player.streak++;
+        let bonusMsg = '';
+        if (player.streak % 3 === 0) {
+          player.shields++;
+          bonusMsg = ' (+1 Safety Shield 🛡️ earned for 3-streak!)';
+        }
+
+        feedbackBox.className = 'rounded-xl p-3.5 mb-4 border border-emerald-500/50 bg-emerald-950/40 text-xs sm:text-sm leading-relaxed';
+        feedbackTitle.className = 'font-bold mb-1 text-emerald-300';
+
+        if (eventType === 'LADDER') {
+          player.score += 200;
+          feedbackTitle.textContent = `✅ Correct! Climbing DNA Helix to Tile ${targetTile}!${bonusMsg}`;
+        } else if (eventType === 'CHUTE') {
+          player.score += 150;
+          feedbackTitle.textContent = `✅ Spill Neutralized! You remain safely at Tile ${player.position}!${bonusMsg}`;
+        } else {
+          player.score += 100;
+          feedbackTitle.textContent = `✅ Verified! +100 Research Points!${bonusMsg}`;
+        }
+      } else {
+        SFX.wrong();
+        player.streak = 0;
+        feedbackBox.className = 'rounded-xl p-3.5 mb-4 border border-rose-500/50 bg-rose-950/40 text-xs sm:text-sm leading-relaxed';
+        feedbackTitle.className = 'font-bold mb-1 text-rose-300';
+
+        if (eventType === 'LADDER') {
+          feedbackTitle.textContent = `❌ Incorrect — You remain at the base (Tile ${player.position}).`;
+        } else if (eventType === 'CHUTE') {
+          if (player.shields > 0) {
+            player.shields--;
+            ctx.shieldSaved = true;
+            feedbackTitle.textContent = `🛡️ Safety Shield Activated! Your PPE shield absorbed the spill and prevented sliding to Tile ${targetTile}!`;
+          } else {
+            feedbackTitle.textContent = `☣️ Containment Breach! Sliding down the chute to Tile ${targetTile}...`;
+          }
+        } else {
+          feedbackTitle.textContent = `❌ Incorrect — Review the lab principle below:`;
+        }
+      }
+
+      ctx.isCorrect = isCorrect;
+      updateUI();
+      document.getElementById('btn-q-continue').classList.remove('hidden');
+    }
+
+    function closeQuestionModal() {
+      const ctx = gameState.pendingTurnContext;
+      closeModal('modal-question');
+      gameState.isModalOpen = false;
+
+      if (!ctx) {
+        advanceToNextTurn();
+        return;
+      }
+
+      const { player, eventType, targetTile, isCorrect, shieldSaved } = ctx;
+      gameState.pendingTurnContext = null;
+
+      if (eventType === 'LADDER' && isCorrect) {
+        SFX.ladder();
+        player.position = targetTile;
+        renderTokensOnBoard();
+        updateUI();
+        logMessage(`🧬 ${player.name} climbed the DNA Helix up to Tile ${targetTile}!`);
+        if (player.position >= TOTAL_TILES) {
+          triggerVictory(player);
+          return;
+        }
+      } else if (eventType === 'CHUTE' && !isCorrect && !shieldSaved) {
+        SFX.chute();
+        player.position = targetTile;
+        renderTokensOnBoard();
+        updateUI();
+        logMessage(`☣️ ${player.name} slipped down the biohazard chute to Tile ${targetTile}.`);
+      }
+
+      advanceToNextTurn();
+    }
+
+    function handleBotTurn(bot, eventType, targetTile, question) {
+      logMessage(`🤖 ${bot.name} is analyzing: "${question.subtopic}"...`);
+      setTimeout(() => {
+        // Lab Bot AI has a 65% accuracy rate so it provides a balanced, fun challenge
+        const botCorrect = Math.random() < 0.65;
+        if (botCorrect) {
+          bot.score += 100;
+          if (eventType === 'LADDER') {
+            SFX.ladder();
+            bot.position = targetTile;
+            logMessage(`🤖 ${bot.name} solved the DNA question and climbed to Tile ${targetTile}!`);
+          } else if (eventType === 'CHUTE') {
+            logMessage(`🤖 ${bot.name} followed lab safety protocols and neutralized the spill at Tile ${bot.position}!`);
+          } else {
+            logMessage(`🤖 ${bot.name} answered correctly (+100 pts) at Tile ${bot.position}.`);
+          }
+        } else {
+          if (eventType === 'CHUTE') {
+            SFX.chute();
+            bot.position = targetTile;
+            logMessage(`🤖 ${bot.name} missed the safety check and slid down to Tile ${targetTile}!`);
+          } else {
+            logMessage(`🤖 ${bot.name} missed the lab question and stayed at Tile ${bot.position}.`);
+          }
+        }
+
+        renderTokensOnBoard();
+        updateUI();
+
+        if (bot.position >= TOTAL_TILES) {
+          triggerVictory(bot);
+        } else {
+          advanceToNextTurn();
+        }
+      }, 1100);
+    }
+
+    function advanceToNextTurn() {
+      if (gameState.gameOver) return;
+
+      gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.players.length;
+      if (gameState.currentPlayerIndex === 0) {
+        gameState.turnNumber++;
+      }
+
+      renderTokensOnBoard();
+      updateUI();
+
+      const nextPlayer = gameState.players[gameState.currentPlayerIndex];
+      document.getElementById('dice-status-text').textContent = 'Ready to Roll';
+      document.getElementById('dice-sub-text').textContent = `${nextPlayer.name}'s turn`;
+
+      if (nextPlayer.isBot) {
+        document.getElementById('btn-roll').disabled = true;
+        setTimeout(() => {
+          handleRollDice();
+        }, 850);
+      } else {
+        document.getElementById('btn-roll').disabled = false;
+      }
+    }
+
+    function triggerVictory(winner) {
+      gameState.gameOver = true;
+      SFX.win();
+      renderTokensOnBoard();
+      updateUI();
+
+      document.getElementById('victory-title').textContent = `${winner.token} ${winner.name} Wins!`;
+      document.getElementById('victory-subtitle').textContent = `Completed BioLab Quest with ${winner.score} Research Points!`;
+
+      const sorted = [...gameState.players].sort((a, b) => b.position - a.position || b.score - a.score);
+      const statsHTML = sorted.map((p, i) => `
+        <div class="flex items-center justify-between py-1.5 border-b border-slate-800 last:border-0">
+          <span class="font-bold text-slate-200">#${i + 1} ${p.token} ${p.name}</span>
+          <span class="font-mono text-cyan-300">Tile ${p.position} • ${p.score} pts</span>
+        </div>
+      `).join('');
+
+      document.getElementById('victory-stats').innerHTML = statsHTML;
+      openModal('modal-victory');
+    }
+
+    /**
+     * =========================================================================
+     * 10. UI & SIDEBAR UPDATES (SCOREBOARD, MASTERY TRACKER, MODALS)
+     * =========================================================================
+     */
+    function updateUI() {
+      const current = gameState.players[gameState.currentPlayerIndex];
+      if (current) {
+        document.getElementById('current-player-badge').textContent = `${current.token} ${current.name}`;
+      }
+      document.getElementById('turn-counter').textContent = `Turn ${gameState.turnNumber}`;
+
+      // Render Scoreboard
+      const sb = document.getElementById('scoreboard-list');
+      sb.innerHTML = '';
+      gameState.players.forEach((p, idx) => {
+        const isCurrent = idx === gameState.currentPlayerIndex && !gameState.gameOver;
+        const pct = Math.min(100, Math.round((p.position / TOTAL_TILES) * 100));
+        const card = document.createElement('div');
+        card.className = `p-2.5 rounded-xl border transition ${isCurrent ? 'bg-slate-800/90 border-cyan-500/70 shadow-md' : 'bg-slate-950/70 border-slate-800'}`;
+        card.innerHTML = `
+          <div class="flex items-center justify-between text-xs mb-1.5">
+            <div class="flex items-center gap-2 font-bold text-slate-100">
+              <span class="text-base">${p.token}</span>
+              <span>${p.name}</span>
+              ${p.shields > 0 ? `<span class="text-[11px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded" title="Safety Shields">🛡️×${p.shields}</span>` : ''}
+            </div>
+            <div class="font-mono text-slate-300">
+              <span class="text-emerald-400 font-bold">Tile ${p.position}</span>/50 • ${p.score}p
+            </div>
+          </div>
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r ${p.color} transition-all duration-300" style="width: ${pct}%"></div>
+          </div>
+        `;
+        sb.appendChild(card);
+      });
+
+      // Render Topic Mastery Tracker
+      const masteryContainer = document.getElementById('mastery-bars');
+      masteryContainer.innerHTML = '';
+      let totalCorrect = 0;
+      let totalAnswered = 0;
+
+      Object.values(gameState.mastery).forEach(cat => {
+        totalCorrect += cat.correct;
+        totalAnswered += cat.total;
+        const acc = cat.total === 0 ? 0 : Math.round((cat.correct / cat.total) * 100);
+        const row = document.createElement('div');
+        row.innerHTML = `
+          <div class="flex justify-between text-[11px] mb-1">
+            <span class="text-slate-300 truncate pr-2">${cat.label}</span>
+            <span class="font-mono text-slate-400 shrink-0">${cat.correct}/${cat.total} (${acc}%)</span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-300" style="width: ${acc}%"></div>
+          </div>
+        `;
+        masteryContainer.appendChild(row);
+      });
+
+      const overallPct = totalAnswered === 0 ? 0 : Math.round((totalCorrect / totalAnswered) * 100);
+      document.getElementById('overall-accuracy').textContent = `${overallPct}% Overall`;
+    }
+
+    function changeTopicFilter(val) {
+      gameState.topicFilter = val;
+      updateTopicBadge();
+      logMessage(`Study focus updated: ${document.getElementById('topic-filter-select').selectedOptions[0].text}`);
+    }
+
+    function updateTopicBadge() {
+      const labels = {
+        ALL: 'Module: All Lab Topics',
+        APPARATUS: 'Focus: Laboratory Apparatuses',
+        SAFETY: 'Focus: General Lab Safety',
+        REPLICATION: 'Focus: DNA Replication',
+        TRANSCRIPTION: 'Focus: Transcription & Translation'
+      };
+      document.getElementById('active-filter-badge').textContent = labels[gameState.topicFilter] || labels.ALL;
+    }
+
+    function logMessage(msg) {
+      document.getElementById('game-log-message').textContent = msg;
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    // Boot default setup preview on load
+    window.addEventListener('DOMContentLoaded', () => {
+      renderSetupPlayerInputs();
+      // Initialize background board preview immediately behind the setup modal
+      gameState.players = [
+        { id: 0, name: 'Dr. Helix', token: '🧬', color: 'from-cyan-500 to-blue-600', ring: 'ring-cyan-400', isBot: false, position: 1, score: 0, streak: 0, shields: 1 },
+        { id: 1, name: 'Lab Bot AI', token: '🤖', color: 'from-emerald-500 to-teal-600', ring: 'ring-emerald-400', isBot: true, position: 1, score: 0, streak: 0, shields: 1 }
+      ];
+      renderBoard();
+      updateUI();
+    });
+  </script>
+</body>
+</html>
+```
